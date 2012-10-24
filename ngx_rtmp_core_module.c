@@ -414,6 +414,10 @@ ngx_rtmp_core_application(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_rtmp_core_app_conf_t   *cacf, **cacfp;
 
+    // どうやらこの部分がconfに記述しているアプリケーションの読み込み時に実行される部分みたいですね。
+//    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+//                       "this is the log test...");
+
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
@@ -486,6 +490,10 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #if (NGX_HAVE_INET6)
     struct sockaddr_in6        *sin6;
 #endif
+
+    // TODO 調子にのってこっちにもいれてみる。
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                       "this is the log testtest...");
 
     value = cf->args->elts;
 
