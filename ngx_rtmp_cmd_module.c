@@ -119,6 +119,7 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_ERROR;
     }
 
+    // TODO この部分か？appを指定しているのは・・・roomのコネクトがきた場合に、applicationを別にしてわたしてやればよいのだろうか？
     len = ngx_strlen(v.app);
     if (len && v.app[len - 1] == '/') {
         v.app[len - 1] = 0;
@@ -237,10 +238,13 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     /* find application & set app_conf */
     len = ngx_strlen(v->app);
 
+    // TODO app_confがマッチするのがみつからない→アクセス失敗(アプリケーションが存在していないとかか？)
     cacfp = cscf->applications.elts;
     for(n = 0; n < cscf->applications.nelts; ++n, ++cacfp) {
-        if ((*cacfp)->name.len == len
-                && !ngx_strncmp((*cacfp)->name.data, v->app, len))
+    	// 実際にこの変更を加えることで、roomっぽい動作をさせることはできた。(正確にはroomの接続もすべて元となるアプリにマージしているだけなので、厳密な意味では違うけど。)
+//        if ((*cacfp)->name.len == len
+//                && !ngx_strncmp((*cacfp)->name.data, v->app, len))
+    	if(!ngx_strncmp((*cacfp)->name.data, v->app, (*cacfp)->name.len))
         {
             /* found app! */
             s->app_conf = (*cacfp)->app_conf;
