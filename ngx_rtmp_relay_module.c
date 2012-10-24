@@ -603,12 +603,16 @@ ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         goto next;
     }
 
+    // TODO vの中身がアクセスしたときにつけていたデータになります。
     name.len = ngx_strlen(v->name);
     name.data = v->name;
 
+    // TODO pullsはarrayでもっているので、複数持てそうだが・・・どうなんだろう。
     t = racf->pulls.elts;
     for (n = 0; n < racf->pulls.nelts; ++n, ++t) {
-        target = *t;
+    	// TODO 定義上pullsにはいっているデータが１つになっているっぽいので、ここのループは１度しか動作しない気がする。
+    	// TODO この部分を動的にふやすみたいなことしてやればいいような気がする。
+    	target = *t;
 
         if (target->name.len && (name.len != target->name.len ||
             ngx_memcmp(name.data, target->name.data, name.len)))
