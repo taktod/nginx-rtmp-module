@@ -238,13 +238,20 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     /* find application & set app_conf */
     len = ngx_strlen(v->app);
 
-    // TODO app_confがマッチするのがみつからない→アクセス失敗(アプリケーションが存在していないとかか？)
     cacfp = cscf->applications.elts;
     for(n = 0; n < cscf->applications.nelts; ++n, ++cacfp) {
-    	// 実際にこの変更を加えることで、roomっぽい動作をさせることはできた。(正確にはroomの接続もすべて元となるアプリにマージしているだけなので、厳密な意味では違うけど。)
-//        if ((*cacfp)->name.len == len
-//                && !ngx_strncmp((*cacfp)->name.data, v->app, len))
-    	if(!ngx_strncmp((*cacfp)->name.data, v->app, (*cacfp)->name.len))
+    	// roomに対応してみた。
+    	// 設定アプリ名 + /
+    	u_char* app = (*cacfp)->name.data;
+    	size_t app_len = ngx_strlen(app);
+    	if(app[app_len - 1] != '/') { // 終端が/でおわらない場合
+    		strcat((char *)app, "/"); // "/"を追加
+    	}
+
+    	// 設定アプリ名の長さが一致して、内容も一致する場合
+    	// 先頭の内容が一致する場合
+        if((app_len - 1 == len && !ngx_strncmp(app, v->app, app_len - 1)) // 100%一致する場合
+        		|| !ngx_strncmp(app, v->app, app_len)) // 先頭 + / + その他の文字列の場合
         {
             /* found app! */
             s->app_conf = (*cacfp)->app_conf;
