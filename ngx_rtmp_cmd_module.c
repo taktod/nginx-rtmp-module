@@ -244,9 +244,9 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     	// 設定アプリ名 + /
     	u_char* app = (*cacfp)->name.data;
     	size_t app_len = ngx_strlen(app);
-    	if(app[app_len - 1] != '/') { // 終端が/でおわらない場合
-    		strcat((char *)app, "/"); // "/"を追加
-    	}
+//    	if(app[app_len - 1] != '/') { // 終端が/でおわらない場合
+//    		strcat((char *)app, "/"); // "/"を追加
+//    	}
 
     	// 設定アプリ名の長さが一致して、内容も一致する場合
     	// 先頭の内容が一致する場合

@@ -582,7 +582,7 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 next:
     return next_publish(s, v);
 }
-
+/*
 static ngx_rtmp_relay_target_t*
 ngx_rtmp_resetup_target(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v, ngx_rtmp_relay_app_conf_t *racf, ngx_rtmp_relay_target_t *target)
 {
@@ -631,7 +631,7 @@ ngx_rtmp_resetup_target(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v, ngx_rtmp_rela
     target->app.len = app.len + room.len;
     if(u_room == NULL) {
 		ngx_sprintf(t_app, "%V", &app);
-		target->app.len = app.len;
+		target->app.len = app.len ++;
     }
     else if(app.data[app.len-1] != '/') {
 		ngx_sprintf(t_app, "%V/%V", &app, &room);
@@ -642,7 +642,7 @@ ngx_rtmp_resetup_target(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v, ngx_rtmp_rela
 	}
     target->app.data = t_app;
 
-    target->name.len  = room.len + stream.len;
+/ *    target->name.len  = room.len + stream.len;
 	if(room.data[room.len - 1] != '/') {
 		ngx_sprintf(t_name, "%V/%V", &room, &stream);
 		target->name.len ++;
@@ -650,6 +650,10 @@ ngx_rtmp_resetup_target(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v, ngx_rtmp_rela
 	else {
 		ngx_sprintf(t_name, "%V%V", &room, &stream);
 	}
+    target->name.data = t_name;
+* /
+    target->name.len  = stream.len;
+	ngx_sprintf(t_name, "%V", &stream);
     target->name.data = t_name;
 
     target->play_path.len  = stream.len;
@@ -661,7 +665,7 @@ ngx_rtmp_resetup_target(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v, ngx_rtmp_rela
 	    	"--------------- %V - %V - %V", &target->name, &target->app, &target->play_path); // ここのtest/12からあたまの部分を取り去っておく。
 
 	return target;
-}
+}*/
 
 static ngx_int_t
 ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
@@ -691,15 +695,16 @@ ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     	target = *t;
     	url = target->url;
 
-    	// 名前が一致するのがあるか確認している。
+    	// 名前が一致するのがあるか確認している。?
         if (target->name.len && (name.len != target->name.len ||
             ngx_memcmp(name.data, target->name.data, name.len)))
         {
         	// すでにstreamが一致するものがあったのでそれを使えばよい。
-            continue;
+//        	goto next;
+        	continue;
         }
         // app play_path nameの設定更新
-        target = ngx_rtmp_resetup_target(s, v, racf, target);
+//        target = ngx_rtmp_resetup_target(s, v, racf, target);
 
         if (ngx_rtmp_relay_pull(s, &name, target) == NGX_OK) {
         	// TODO ここ、みつけた処理ぬけていいと思う。
@@ -734,7 +739,84 @@ ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     target->data = target;
     target->url = url;
     // app play_path nameの設定更新
-    target = ngx_rtmp_resetup_target(s, v, racf, target);
+//    target = ngx_rtmp_resetup_target(s, v, racf, target);
+    // この３つを入力ストリームで上書きします。
+    // pull rtmp://rtmpServer/live;という設定で
+    // rtmp://localhost/test/room name=streamでアクセスしている場合
+    // app=live/room
+    // name=room/stream
+    // play_path=stream
+
+	ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+	    	"--------------- %s - %s - %s", target->url.url.data, s->app.data, v->name); // ここのtest/12からあたまの部分を取り去っておく。
+
+	// 元データから必要な部分を取得
+	ngx_str_t app;
+	ngx_str_t room;
+	ngx_str_t stream;
+	u_char *u_app = (u_char*)ngx_strchr(target->url.url.data, '/');
+	if(u_app == NULL) {
+		u_app = target->url.url.data;
+	}
+	else {
+		u_app++;
+	}
+	app.len = target->url.url.len - (u_app - target->url.url.data);
+	app.data = u_app;
+	u_char *u_room = (u_char*)ngx_strchr(s->app.data, '/');
+	if(u_room == NULL) {
+		room.len = 0;
+		room.data = (u_char *)"";
+	}
+	else {
+		u_room ++;
+		room.len = s->app.len - (u_room - s->app.data);
+		room.data = u_room;
+	}
+	stream.len = ngx_strlen(v->name);
+	stream.data = v->name;
+
+	u_char t_app[NGX_RTMP_MAX_NAME];
+	u_char t_name[NGX_RTMP_MAX_NAME];
+	u_char t_play_path[NGX_RTMP_MAX_NAME];
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+	    	"--------------- %V - %V - %V", &app, &room, &stream); // ここのtest/12からあたまの部分を取り去っておく。
+
+    target->app.len = app.len + room.len;
+    if(u_room == NULL) {
+		ngx_sprintf(t_app, "%V", &app);
+		target->app.len = app.len ++;
+    }
+    else if(app.data[app.len-1] != '/') {
+		ngx_sprintf(t_app, "%V/%V", &app, &room);
+		target->app.len ++;
+	}
+	else {
+		ngx_sprintf(t_app, "%V%V", &app, &room);
+	}
+    target->app.data = t_app;
+
+/*    target->name.len  = room.len + stream.len;
+	if(room.data[room.len - 1] != '/') {
+		ngx_sprintf(t_name, "%V/%V", &room, &stream);
+		target->name.len ++;
+	}
+	else {
+		ngx_sprintf(t_name, "%V%V", &room, &stream);
+	}
+    target->name.data = t_name;
+*/
+    target->name.len  = stream.len;
+	ngx_sprintf(t_name, "%V", &stream);
+    target->name.data = t_name;
+
+    target->play_path.len  = stream.len;
+	ngx_sprintf(t_play_path, "%V", &stream);
+    target->play_path.data = t_play_path;
+
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+	    	"--------------- %V - %V - %V", &target->name, &target->app, &target->play_path); // ここのtest/12からあたまの部分を取り去っておく。
 
     if (ngx_rtmp_relay_pull(s, &name, target) != NGX_OK) {
     	// pullの実動作がうまくできなかったのでエラーを吐いて(ry
