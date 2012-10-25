@@ -583,6 +583,85 @@ next:
     return next_publish(s, v);
 }
 
+static ngx_rtmp_relay_target_t*
+ngx_rtmp_resetup_target(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v, ngx_rtmp_relay_app_conf_t *racf, ngx_rtmp_relay_target_t *target)
+{
+    // この３つを入力ストリームで上書きします。
+    // pull rtmp://rtmpServer/live;という設定で
+    // rtmp://localhost/test/room name=streamでアクセスしている場合
+    // app=live/room
+    // name=room/stream
+    // play_path=stream
+
+	ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+	    	"--------------- %s - %s - %s", target->url.url.data, s->app.data, v->name); // ここのtest/12からあたまの部分を取り去っておく。
+
+	// 元データから必要な部分を取得
+	ngx_str_t app;
+	ngx_str_t room;
+	ngx_str_t stream;
+	u_char *u_app = (u_char*)ngx_strchr(target->url.url.data, '/');
+	if(u_app == NULL) {
+		u_app = target->url.url.data;
+	}
+	else {
+		u_app++;
+	}
+	app.len = target->url.url.len - (u_app - target->url.url.data);
+	app.data = u_app;
+	u_char *u_room = (u_char*)ngx_strchr(s->app.data, '/');
+	if(u_room == NULL) {
+		room.len = 0;
+		room.data = (u_char *)"";
+	}
+	else {
+		u_room ++;
+		room.len = s->app.len - (u_room - s->app.data);
+		room.data = u_room;
+	}
+	stream.len = ngx_strlen(v->name);
+	stream.data = v->name;
+
+	u_char t_app[NGX_RTMP_MAX_NAME];
+	u_char t_name[NGX_RTMP_MAX_NAME];
+	u_char t_play_path[NGX_RTMP_MAX_NAME];
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+	    	"--------------- %V - %V - %V", &app, &room, &stream); // ここのtest/12からあたまの部分を取り去っておく。
+
+    target->app.len = app.len + room.len;
+    if(u_room == NULL) {
+		ngx_sprintf(t_app, "%V", &app);
+		target->app.len = app.len;
+    }
+    else if(app.data[app.len-1] != '/') {
+		ngx_sprintf(t_app, "%V/%V", &app, &room);
+		target->app.len ++;
+	}
+	else {
+		ngx_sprintf(t_app, "%V%V", &app, &room);
+	}
+    target->app.data = t_app;
+
+    target->name.len  = room.len + stream.len;
+	if(room.data[room.len - 1] != '/') {
+		ngx_sprintf(t_name, "%V/%V", &room, &stream);
+		target->name.len ++;
+	}
+	else {
+		ngx_sprintf(t_name, "%V%V", &room, &stream);
+	}
+    target->name.data = t_name;
+
+    target->play_path.len  = stream.len;
+	ngx_sprintf(t_play_path, "%V", &stream);
+    target->play_path.data = t_play_path;
+
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+	    	"--------------- %V - %V - %V", &target->name, &target->app, &target->play_path); // ここのtest/12からあたまの部分を取り去っておく。
+
+	return target;
+}
 
 static ngx_int_t
 ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
@@ -592,6 +671,7 @@ ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ngx_str_t                       name;
     size_t                          n;
     ngx_rtmp_relay_ctx_t           *ctx;
+    ngx_url_t                       url;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
     if (ctx && ctx->relay) {
@@ -600,34 +680,68 @@ ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_relay_module);
     if (racf == NULL || racf->pulls.nelts == 0) {
-        goto next;
+    	goto next;
     }
 
-    // TODO vの中身がアクセスしたときにつけていたデータになります。
     name.len = ngx_strlen(v->name);
     name.data = v->name;
 
-    // TODO pullsはarrayでもっているので、複数持てそうだが・・・どうなんだろう。
     t = racf->pulls.elts;
     for (n = 0; n < racf->pulls.nelts; ++n, ++t) {
-    	// TODO 定義上pullsにはいっているデータが１つになっているっぽいので、ここのループは１度しか動作しない気がする。
-    	// TODO この部分を動的にふやすみたいなことしてやればいいような気がする。
     	target = *t;
+    	url = target->url;
 
+    	// 名前が一致するのがあるか確認している。
         if (target->name.len && (name.len != target->name.len ||
             ngx_memcmp(name.data, target->name.data, name.len)))
         {
+        	// すでにstreamが一致するものがあったのでそれを使えばよい。
             continue;
         }
+        // app play_path nameの設定更新
+        target = ngx_rtmp_resetup_target(s, v, racf, target);
 
         if (ngx_rtmp_relay_pull(s, &name, target) == NGX_OK) {
-            continue;
+        	// TODO ここ、みつけた処理ぬけていいと思う。
+        	goto next;
+//            continue;
         }
 
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "relay: pull failed name='%V' app='%V' "
                 "playpath='%V' url='%V'",
                 &name, &target->app, &target->play_path, 
+                &target->url.url);
+    }
+    // targetに利用できるストリームがなかったということになるので、対処しておく。
+    // racfのpulls用のターゲットのarrayをpushして増やしておく
+    t = ngx_array_push(&racf->pulls);
+    if(t == NULL) {
+    	// エラーを吐いてプロセスをとめておく。
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                "relay: pull failed to make array_push");
+    }
+    // targetの実体を作成
+    target = ngx_pcalloc(s->in_pool, sizeof(*target));
+    if(target == NULL) {
+    	// エラーを吐いて(ry
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                "relay: pull failed to make target object");
+    }
+    *t = target;
+    // 下準備
+    target->tag = &ngx_rtmp_relay_module;
+    target->data = target;
+    target->url = url;
+    // app play_path nameの設定更新
+    target = ngx_rtmp_resetup_target(s, v, racf, target);
+
+    if (ngx_rtmp_relay_pull(s, &name, target) != NGX_OK) {
+    	// pullの実動作がうまくできなかったのでエラーを吐いて(ry
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                "relay: pull failed name='%V' app='%V' "
+                "playpath='%V' url='%V'",
+                &name, &target->app, &target->play_path,
                 &target->url.url);
     }
 
