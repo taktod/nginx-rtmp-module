@@ -492,8 +492,8 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
 
     // TODO 調子にのってこっちにもいれてみる。
-    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                       "this is the log testtest...");
+//    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+//                       "this is the log testtest...");
 
     value = cf->args->elts;
 
