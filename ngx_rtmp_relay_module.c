@@ -622,6 +622,7 @@ ngx_rtmp_resetup_target(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v, ngx_rtmp_rela
 	stream.len = ngx_strlen(v->name);
 	stream.data = v->name;
 
+	// TODO ここで定義した変数、lifetimeがこの関数内なので、そとでデータがこわれる。
 	u_char t_app[NGX_RTMP_MAX_NAME];
 	u_char t_name[NGX_RTMP_MAX_NAME];
 	u_char t_play_path[NGX_RTMP_MAX_NAME];
@@ -776,6 +777,8 @@ ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 	stream.len = ngx_strlen(v->name);
 	stream.data = v->name;
 
+	// TODO ここで定義しているデータ、関数の外に出たらlifetimeの関係で壊れる恐れあり。
+	// なのできちんとメモリーを保持しておかないとだめ。
 	u_char t_app[NGX_RTMP_MAX_NAME];
 	u_char t_name[NGX_RTMP_MAX_NAME];
 	u_char t_play_path[NGX_RTMP_MAX_NAME];
